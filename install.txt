@@ -1,0 +1,9 @@
+apt-get install gcc g++ python python3 python3-dev
+
+mkdir repos
+cd repos
+git clone https://gitlab.com/nsnam/ns-3-allinone.git
+
+cd ns-3-allinone/
+./download.py -n ns-3.30
+./build.py
