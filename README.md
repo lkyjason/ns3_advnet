@@ -37,7 +37,9 @@ Clone this into ns3.30/scratch
 
 ./waf --run hello-simulator
 
+
 ./waf --run <ns3-program> --command-template="%s <args>"
 
 
+https://github.com/nyuwireless-unipd/ns3-mmwave.git
 
