@@ -20,6 +20,10 @@ using namespace mmwave;
  NS_LOG_COMPONENT_DEFINE ("ECHOEXAMPLE");
 
  int main (int argc, char *argv[]) {
+	//LogComponentEnable ("TcpSocketBase", LOG_LEVEL_INFO);
+     LogComponentEnable("UdpEchoClientApplication", LOG_LEVEL_INFO);
+     LogComponentEnable("UdpEchoServerApplication", LOG_LEVEL_INFO);
+    
     Config::SetDefault ("ns3::LteRlcUm::MaxTxBufferSize", UintegerValue (1024 * 1024));
 	Config::SetDefault ("ns3::MmWavePhyMacCommon::ResourceBlockNum", UintegerValue(1));
 	Config::SetDefault ("ns3::MmWavePhyMacCommon::ChunkPerRB", UintegerValue(72));
@@ -46,27 +50,33 @@ using namespace mmwave;
 	Ptr<Node> pgw = epcHelper->GetPgwNode ();
 
 	// Create a single RemoteHost
-	NodeContainer remoteHostContainer;
-	remoteHostContainer.Create (1);
-	Ptr<Node> remoteHost = remoteHostContainer.Get (0);
+	NodeContainer nodes;
+	nodes.Create (2);
 	InternetStackHelper internet;
-	internet.Install (remoteHostContainer);
+	internet.Install (nodes);
 
 	// Create the Internet
 	PointToPointHelper p2ph;
 	p2ph.SetDeviceAttribute ("DataRate", DataRateValue (DataRate ("100Gb/s")));
 	p2ph.SetDeviceAttribute ("Mtu", UintegerValue (1500));
 	p2ph.SetChannelAttribute ("Delay", TimeValue (MicroSeconds (1)));
-	NetDeviceContainer internetDevices = p2ph.Install (pgw, remoteHost);
+
+    // setup links
+	NetDeviceContainer clientDevices = p2ph.Install (pgw, nodes.Get(0));
+	NetDeviceContainer serverDevices = p2ph.Install (pgw, nodes.Get(1));
+
+    // assign IPs
 	Ipv4AddressHelper ipv4h;
 	ipv4h.SetBase ("1.0.0.0", "255.0.0.0");
-	Ipv4InterfaceContainer internetIpIfaces = ipv4h.Assign (internetDevices);
-	// interface 0 is localhost, 1 is the p2p device
-	remoteHostAddr = internetIpIfaces.GetAddress (1);
+	Ipv4InterfaceContainer clientIF = ipv4h.Assign (clientDevices);
+	Ipv4InterfaceContainer serverIF = ipv4h.Assign (serverDevices);
 
+    // setup routing
 	Ipv4StaticRoutingHelper ipv4RoutingHelper;
-	Ptr<Ipv4StaticRouting> remoteHostStaticRouting = ipv4RoutingHelper.GetStaticRouting (remoteHost->GetObject<Ipv4> ());
-	remoteHostStaticRouting->AddNetworkRouteTo (Ipv4Address ("7.0.0.0"), Ipv4Mask ("255.0.0.0"), 1);
+	Ptr<Ipv4StaticRouting> clientStaticRouting = ipv4RoutingHelper.GetStaticRouting (nodes.Get(0)->GetObject<Ipv4> ());
+	clientStaticRouting->AddNetworkRouteTo (Ipv4Address ("7.0.0.0"), Ipv4Mask ("255.0.0.0"), 1);
+	Ptr<Ipv4StaticRouting> serverStaticRouting = ipv4RoutingHelper.GetStaticRouting (nodes.Get(1)->GetObject<Ipv4> ());
+	serverStaticRouting->AddNetworkRouteTo (Ipv4Address ("7.0.0.0"), Ipv4Mask ("255.0.0.0"), 1);
 
 	NodeContainer ueNodes;
 	NodeContainer enbNodes;
@@ -108,17 +118,17 @@ using namespace mmwave;
 
     // setup echo server
     UdpEchoServerHelper echoServer (9);
-    ApplicationContainer serverApps = echoServer.Install (ueNodes.Get (0));
+    ApplicationContainer serverApps = echoServer.Install (nodes.Get (1));
     serverApps.Start (Seconds (1.0));
     serverApps.Stop (Seconds (10.0));
 
     // setup echo client
-    UdpEchoClientHelper echoClient (internetIpIfaces.GetAddress (1), 9);
+    UdpEchoClientHelper echoClient (serverIF.GetAddress (1), 9);
     echoClient.SetAttribute ("MaxPackets", UintegerValue (1));
     echoClient.SetAttribute ("Interval", TimeValue (Seconds (1.)));
     echoClient.SetAttribute ("PacketSize", UintegerValue (1024));
 
-    ApplicationContainer clientApps = echoClient.Install (remoteHost);
+    ApplicationContainer clientApps = echoClient.Install (nodes.Get(0));
     clientApps.Start (Seconds (2.0));
     clientApps.Stop (Seconds (10.0));
 
