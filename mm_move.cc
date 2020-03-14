@@ -62,6 +62,34 @@ void configure_ue(Ptr<Node> ueNode, Ptr<MmWavePointToPointEpcHelper> epcHelper,
     clientApp.Stop (Seconds (10.0));
 }
 
+MobilityHelper setup_static_mob(Vector v) {
+	MobilityHelper mobh;
+	Ptr<ListPositionAllocator> enbPositionAlloc = CreateObject<ListPositionAllocator> ();
+	enbPositionAlloc->Add(v);
+	mobh.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
+	mobh.SetPositionAllocator(enbPositionAlloc);
+
+    return mobh;
+}
+
+void setup_enb_ue(Ptr<MmWaveHelper> mmwaveHelper, InternetStackHelper internet, 
+                    Ptr<MmWavePointToPointEpcHelper> epcHelper,
+	                NodeContainer ueNodes, NodeContainer enbNodes) {
+
+	// Install LTE Devices to the nodes
+	NetDeviceContainer enbDevs = mmwaveHelper->InstallEnbDevice (enbNodes);
+	NetDeviceContainer ueDevs = mmwaveHelper->InstallUeDevice (ueNodes);
+
+	// Install the IP stack on the UEs
+	// Assign IP address to UEs, and install applications
+	internet.Install (ueNodes);
+	Ipv4InterfaceContainer ueIpIface;
+	ueIpIface = epcHelper->AssignUeIpv4Address (NetDeviceContainer (ueDevs));
+
+	mmwaveHelper->AttachToClosestEnb (ueDevs, enbDevs);
+	mmwaveHelper->EnableTraces ();
+}
+
 NS_LOG_COMPONENT_DEFINE ("ECHOEXAMPLE");
 
 int main (int argc, char *argv[]) {
@@ -87,36 +115,18 @@ int main (int argc, char *argv[]) {
 
 	NodeContainer ueNodes;
 	NodeContainer enbNodes;
-	enbNodes.Create(1);
+	enbNodes.Create(2);
 	ueNodes.Create(2);
 
 	// Install Mobility Model
-	MobilityHelper enbmobility;
-	Ptr<ListPositionAllocator> enbPositionAlloc = CreateObject<ListPositionAllocator> ();
-	enbPositionAlloc->Add (Vector (0.0, 0.0, 0.0));
-	enbmobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
-	enbmobility.SetPositionAllocator(enbPositionAlloc);
-	enbmobility.Install (enbNodes);
+	MobilityHelper enbmobility = setup_static_mob(Vector(0.0, 0.0, 0.0));;
+	MobilityHelper uemobility = setup_static_mob(Vector(30.0, 0.0, 0.0));;
 
-	MobilityHelper uemobility;
-	Ptr<ListPositionAllocator> uePositionAlloc = CreateObject<ListPositionAllocator> ();
-	uePositionAlloc->Add (Vector (30.0, 0.0, 0.0));
-	uemobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
-	uemobility.SetPositionAllocator(uePositionAlloc);
+	uemobility.Install (enbNodes);
 	uemobility.Install (ueNodes);
 
-	// Install LTE Devices to the nodes
-	NetDeviceContainer enbDevs = mmwaveHelper->InstallEnbDevice (enbNodes);
-	NetDeviceContainer ueDevs = mmwaveHelper->InstallUeDevice (ueNodes);
-
-	// Install the IP stack on the UEs
-	// Assign IP address to UEs, and install applications
-	internet.Install (ueNodes);
-	Ipv4InterfaceContainer ueIpIface;
-	ueIpIface = epcHelper->AssignUeIpv4Address (NetDeviceContainer (ueDevs));
-
-	mmwaveHelper->AttachToClosestEnb (ueDevs, enbDevs);
-	mmwaveHelper->EnableTraces ();
+    // setup UE ENB common
+    setup_enb_ue(mmwaveHelper, internet, epcHelper, ueNodes, enbNodes);
 
     // setup echo client
     UdpEchoClientHelper echoClient (server_addr, 9);
