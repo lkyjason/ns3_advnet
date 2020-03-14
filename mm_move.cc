@@ -1,7 +1,4 @@
 #include "ns3/core-module.h"
-//#include "ns3/simulator-module.h"
-//#include "ns3/node-module.h"
-//#include "ns3/helper-module.h"
 #include "ns3/node-container.h"
 #include "ns3/net-device-container.h"
 #include "ns3/point-to-point-module.h"
@@ -17,27 +14,11 @@
 using namespace ns3;
 using namespace mmwave;
 
- NS_LOG_COMPONENT_DEFINE ("ECHOEXAMPLE");
-
- int main (int argc, char *argv[]) {
-     LogComponentEnable("UdpEchoClientApplication", LOG_LEVEL_INFO);
-     LogComponentEnable("UdpEchoServerApplication", LOG_LEVEL_INFO);
-    
-    Config::SetDefault ("ns3::LteRlcUm::MaxTxBufferSize", UintegerValue (1024 * 1024));
-	Config::SetDefault ("ns3::MmWavePhyMacCommon::ResourceBlockNum", UintegerValue(1));
-	Config::SetDefault ("ns3::MmWavePhyMacCommon::ChunkPerRB", UintegerValue(72));
-
-	Ptr<MmWaveHelper> mmwaveHelper = CreateObject<MmWaveHelper> ();
-	mmwaveHelper->SetSchedulerType ("ns3::MmWaveFlexTtiMacScheduler");
-	Ptr<MmWavePointToPointEpcHelper>  epcHelper = CreateObject<MmWavePointToPointEpcHelper> ();
-	mmwaveHelper->SetEpcHelper (epcHelper);
-
-	Ptr<Node> pgw = epcHelper->GetPgwNode ();
+Ipv4Address setup_remote(Ptr<Node> pgw, Ipv4StaticRoutingHelper ipv4RoutingHelper, InternetStackHelper internet) {
 
 	// Create a remote server 
 	NodeContainer nodes;
 	nodes.Create (1);
-	InternetStackHelper internet;
 	internet.Install (nodes);
     Ptr<Node> server = nodes.Get(0);
 
@@ -57,11 +38,52 @@ using namespace mmwave;
 	Ipv4Address server_addr = serverIF.GetAddress (1);
 
     // setup routing
-	Ipv4StaticRoutingHelper ipv4RoutingHelper;
-	Ptr<Ipv4StaticRouting> clientStaticRouting = ipv4RoutingHelper.GetStaticRouting (nodes.Get(0)->GetObject<Ipv4> ());
-	clientStaticRouting->AddNetworkRouteTo (Ipv4Address ("7.0.0.0"), Ipv4Mask ("255.0.0.0"), 1);
-	Ptr<Ipv4StaticRouting> serverStaticRouting = ipv4RoutingHelper.GetStaticRouting (nodes.Get(1)->GetObject<Ipv4> ());
+	Ptr<Ipv4StaticRouting> serverStaticRouting = ipv4RoutingHelper.GetStaticRouting (nodes.Get(0)->GetObject<Ipv4> ());
 	serverStaticRouting->AddNetworkRouteTo (Ipv4Address ("7.0.0.0"), Ipv4Mask ("255.0.0.0"), 1);
+
+    // setup echo server
+    UdpEchoServerHelper echoServer (9);
+    ApplicationContainer serverApps = echoServer.Install (server);
+    serverApps.Start (Seconds (1.0));
+    serverApps.Stop (Seconds (10.0));
+
+    return server_addr;
+}
+
+void configure_ue(Ptr<Node> ueNode, Ptr<MmWavePointToPointEpcHelper> epcHelper, 
+                    UdpEchoClientHelper client, Ipv4StaticRoutingHelper ipv4RoutingHelper) {
+
+    // Set the default gateway for the UE
+	Ptr<Ipv4StaticRouting> ueStaticRouting = ipv4RoutingHelper.GetStaticRouting (ueNode->GetObject<Ipv4> ());
+	ueStaticRouting->SetDefaultRoute (epcHelper->GetUeDefaultGatewayAddress (), 1);
+
+    ApplicationContainer clientApp = client.Install (ueNode);
+    clientApp.Start (Seconds (2.0));
+    clientApp.Stop (Seconds (10.0));
+}
+
+NS_LOG_COMPONENT_DEFINE ("ECHOEXAMPLE");
+
+int main (int argc, char *argv[]) {
+    LogComponentEnable("UdpEchoClientApplication", LOG_LEVEL_INFO);
+    LogComponentEnable("UdpEchoServerApplication", LOG_LEVEL_INFO);
+    
+    Config::SetDefault ("ns3::LteRlcUm::MaxTxBufferSize", UintegerValue (1024 * 1024));
+	Config::SetDefault ("ns3::MmWavePhyMacCommon::ResourceBlockNum", UintegerValue(1));
+	Config::SetDefault ("ns3::MmWavePhyMacCommon::ChunkPerRB", UintegerValue(72));
+
+    // declare common
+	Ipv4StaticRoutingHelper ipv4RoutingHelper;
+	InternetStackHelper internet;
+
+	Ptr<MmWaveHelper> mmwaveHelper = CreateObject<MmWaveHelper> ();
+	mmwaveHelper->SetSchedulerType ("ns3::MmWaveFlexTtiMacScheduler");
+	Ptr<MmWavePointToPointEpcHelper>  epcHelper = CreateObject<MmWavePointToPointEpcHelper> ();
+	mmwaveHelper->SetEpcHelper (epcHelper);
+	Ptr<Node> pgw = epcHelper->GetPgwNode ();
+
+    // setup remote host
+    Ipv4Address server_addr = setup_remote(pgw, ipv4RoutingHelper, internet);
 
 	NodeContainer ueNodes;
 	NodeContainer enbNodes;
@@ -96,35 +118,14 @@ using namespace mmwave;
 	mmwaveHelper->AttachToClosestEnb (ueDevs, enbDevs);
 	mmwaveHelper->EnableTraces ();
 
-    // setup echo server
-    UdpEchoServerHelper echoServer (9);
-    ApplicationContainer serverApps = echoServer.Install (server);
-    serverApps.Start (Seconds (1.0));
-    serverApps.Stop (Seconds (10.0));
-
     // setup echo client
     UdpEchoClientHelper echoClient (server_addr, 9);
     echoClient.SetAttribute ("MaxPackets", UintegerValue (1));
     echoClient.SetAttribute ("Interval", TimeValue (Seconds (1.)));
     echoClient.SetAttribute ("PacketSize", UintegerValue (1024));
 
-	// Set the default gateway for the UE
-	Ptr<Node> ueNode1 = ueNodes.Get (0);
-	Ptr<Ipv4StaticRouting> ueStaticRouting = ipv4RoutingHelper.GetStaticRouting (ueNode1->GetObject<Ipv4> ());
-	ueStaticRouting->SetDefaultRoute (epcHelper->GetUeDefaultGatewayAddress (), 1);
-
-    ApplicationContainer clientApp1 = echoClient.Install (ueNode1);
-    clientApp1.Start (Seconds (2.0));
-    clientApp1.Stop (Seconds (10.0));
-
-    // Set the default gateway for the UE
-	Ptr<Node> ueNode2 = ueNodes.Get (1);
-	Ptr<Ipv4StaticRouting> ueStaticRouting2 = ipv4RoutingHelper.GetStaticRouting (ueNode2->GetObject<Ipv4> ());
-	ueStaticRouting2->SetDefaultRoute (epcHelper->GetUeDefaultGatewayAddress (), 1);
-
-    ApplicationContainer clientApp2 = echoClient.Install (ueNode2);
-    clientApp2.Start (Seconds (2.0));
-    clientApp2.Stop (Seconds (10.0));
+    configure_ue(ueNodes.Get(0), epcHelper, echoClient, ipv4RoutingHelper);
+    configure_ue(ueNodes.Get(1), epcHelper, echoClient, ipv4RoutingHelper);
 
     // start simulation
     Simulator::Run ();
