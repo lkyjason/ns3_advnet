@@ -72,6 +72,16 @@ MobilityHelper setup_static_mob(Vector v) {
     return mobh;
 }
 
+MobilityHelper setup_moving_mob(Vector v) {
+	MobilityHelper mobh;
+	//Ptr<ListPositionAllocator> enbPositionAlloc = CreateObject<ListPositionAllocator> ();
+	//enbPositionAlloc->Add(v);
+	mobh.SetMobilityModel ("ns3::ConstantVelocityMobilityModel");
+	//mobh.SetPositionAllocator(enbPositionAlloc);
+
+    return mobh;
+}
+
 void setup_enb_ue(Ptr<MmWaveHelper> mmwaveHelper, InternetStackHelper internet, 
                     Ptr<MmWavePointToPointEpcHelper> epcHelper,
 	                NodeContainer ueNodes, NodeContainer enbNodes) {
@@ -119,11 +129,24 @@ int main (int argc, char *argv[]) {
 	ueNodes.Create(2);
 
 	// Install Mobility Model
-	MobilityHelper enbmobility = setup_static_mob(Vector(0.0, 0.0, 0.0));;
-	MobilityHelper uemobility = setup_static_mob(Vector(30.0, 0.0, 0.0));;
+	MobilityHelper enb_a = setup_static_mob(Vector(0.0, 0.0, 0.0));;
+	MobilityHelper enb_b = setup_static_mob(Vector(30.0, 0.0, 0.0));;
 
-	uemobility.Install (enbNodes);
-	uemobility.Install (ueNodes);
+	enb_a.Install (enbNodes.Get(0));
+	enb_b.Install (enbNodes.Get(1));
+
+    // setup moving mobility
+	MobilityHelper ue_a;
+	MobilityHelper ue_b;
+	ue_a.SetMobilityModel ("ns3::ConstantVelocityMobilityModel");
+	ue_b.SetMobilityModel ("ns3::ConstantVelocityMobilityModel");
+	ue_a.Install (ueNodes.Get(0));
+	ue_b.Install (ueNodes.Get(1));
+
+    ueNodes.Get(0)->GetObject<MobilityModel>()->SetPosition (Vector (1, 0.0, 0.0));
+    ueNodes.Get(1)->GetObject<MobilityModel>()->SetPosition (Vector (29, 0.0, 0.0));
+    ueNodes.Get(0)->GetObject<ConstantVelocityMobilityModel>()->SetVelocity(Vector (1, 0, 0));
+    ueNodes.Get(1)->GetObject<ConstantVelocityMobilityModel>()->SetVelocity(Vector (-1, 0, 0));
 
     // setup UE ENB common
     setup_enb_ue(mmwaveHelper, internet, epcHelper, ueNodes, enbNodes);
