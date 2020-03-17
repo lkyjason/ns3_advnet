@@ -47,3 +47,5 @@ YOu should be in /home/kished/repos/ns-3-allinone/ns3-mmwave of the VM.
 ./waf   # this builds 
 ./waf --run mm_echo     # basic echo with mmwave
 ./waf --run mm_multi    # the multi-UE example - this is slow
+
+./waf --run mm_move &> trial.txt
