@@ -175,25 +175,19 @@ main (int argc, char *argv[])
 	Config::SetDefault ("ns3::LteRlcUm::MaxTxBufferSize", UintegerValue (1024 * 1024));
 	Config::SetDefault ("ns3::MmWavePhyMacCommon::ResourceBlockNum", UintegerValue(1));
 	Config::SetDefault ("ns3::MmWavePhyMacCommon::ChunkPerRB", UintegerValue(72));
+    Config::SetDefault ("ns3::TcpL4Protocol::SocketType", StringValue ("ns3::TcpHtcp"));
 	double stopTime = 5.9;
 	double simStopTime = 7.00;
 	Ipv4Address remoteHostAddr;
 
-	// Command line arguments
-	CommandLine cmd;
-	cmd.Parse(argc, argv);
+	ConfigStore inputConfig;
+	inputConfig.ConfigureDefaults();
 
 	Ptr<MmWaveHelper> mmwaveHelper = CreateObject<MmWaveHelper> ();
 	//mmwaveHelper->SetSchedulerType ("ns3::MmWaveFlexTtiMaxWeightMacScheduler");
 	mmwaveHelper->SetSchedulerType ("ns3::MmWaveFlexTtiMacScheduler");
 	Ptr<MmWavePointToPointEpcHelper>  epcHelper = CreateObject<MmWavePointToPointEpcHelper> ();
 	mmwaveHelper->SetEpcHelper (epcHelper);
-
-	ConfigStore inputConfig;
-	inputConfig.ConfigureDefaults();
-
-	// parse again so you can override default values from the command line
-	cmd.Parse(argc, argv);
 
 	Ptr<Node> pgw = epcHelper->GetPgwNode ();
 
@@ -270,7 +264,7 @@ main (int argc, char *argv[])
 	Ptr<Socket> ns3TcpSocket = Socket::CreateSocket (remoteHostContainer.Get (0), TcpSocketFactory::GetTypeId ());
 
 	Ptr<MyApp> app = CreateObject<MyApp> ();
-	app->Setup (ns3TcpSocket, sinkAddress, 1000, 500, DataRate ("30Mb/s"));
+	app->Setup (ns3TcpSocket, sinkAddress, 1000, 20000, DataRate ("30Mb/s"));
 	remoteHostContainer.Get (0)->AddApplication (app);
 
 	AsciiTraceHelper asciiTraceHelper;
@@ -288,10 +282,8 @@ main (int argc, char *argv[])
 	Simulator::Stop (Seconds (simStopTime));
 	Simulator::Run ();
 
-
 	Simulator::Destroy ();
 
 	return 0;
-
 }
 
