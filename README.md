@@ -1,51 +1,65 @@
-https://www.nsnam.org/docs/release/3.30/tutorial/singlehtml/index.html#build-profiles
+This is a guide to setting up ns-3, NYU's mmWave module, and our own additions.
 
-## Basic Setup
+Assumes the use of Ubuntu 18.04, you're on your own otherwise.
 
-Assumes Ubuntu 18.04, you're on your own otherwise
+# Setup
 
-apt-get install gcc g++ python python3 python3-dev
+## ns-3 Dependencies
 
-mkdir repos
+`apt-get install gcc g++ python python3 python3-dev`
 
-cd repos
+## Cloning the ns-3 Repository
 
-git clone https://gitlab.com/nsnam/ns-3-allinone.git
+`mkdir repos`
 
+`cd repos`
 
-cd ns-3-allinone/
+`git clone https://gitlab.com/nsnam/ns-3-allinone.git`
 
-./download.py -n ns-3.30
+## ns-3 Variants
 
-./build.py	# takes forever
+`cd ns-3-allinone/`
 
+You can use the baseline ns3 version, or skip right over to setup NYU's module.
 
-cd ns-3.30
+`./download.py -n ns-3.30`
 
-./waf clean
+`./build.py`
 
-./waf configure --build-profile=debug--enable-examples --enable-tests
+`cd ns-3.30`
 
-## This Repo
-Clone this into ns3.30/scratch
+`./waf clean`
 
-## Other Tests
-./test.py 	# really takes forever
+`./waf configure --build-profile=debug--enable-examples --enable-tests`
 
-./waf --run hello-simulator
+If you want to use mmWave, make sure you are in the ns-3-allinone directory, then:
 
-./waf --run <ns3-program> --command-template="%s <args>"
-  
-./waf --run simple-global-routing
+`git clone https://github.com/nyuwireless-unipd/ns3-mmwave.git`
 
-https://github.com/nyuwireless-unipd/ns3-mmwave.git
+`cd ns3-mmwave`
+
+`./waf configure --build-profile=debug--enable-examples --enable-tests`
+
+`./waf`
 
 ## Running Our Stuff
 
-YOu should be in /home/kished/repos/ns-3-allinone/ns3-mmwave of the VM.
+Taking ns3-mmwave as project root, place the files as follows:
+
+`/src/internet/model`
+
+* network-slices.h
+* tcp-bic2.cc
+* tcp-bic2.hh
+* tcp-cmu.cc
+* tcp-cmu.hh
+
+`/scratch`
+
+* tcp_two.cc
+
+Now look at the file `/src/internet/wscript`. Do a search for `ledbat` or `yeah` and you will find a big list of .cc files. Add the two .cc files above to this list.
 
 ./waf   # this builds 
-./waf --run mm_echo     # basic echo with mmwave
-./waf --run mm_multi    # the multi-UE example - this is slow
+./waf --run tcp_two
 
-./waf --run mm_move &> trial.txt
